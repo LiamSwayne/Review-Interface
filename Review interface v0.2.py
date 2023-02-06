@@ -4,11 +4,13 @@
 # change to whatever file name you use
 REVIEW_FILE_NAME = "Reviews.txt"
 # COMMANDS:
-# Enter title to access review
+# enter title to access review
+# type 'stat' to get dataset statistics
 # 'e' to exit
 
 # update: added histogram, while loop decision correction
 # TODO: max characters per line word cutoff
+# TODO: add 'perfect' special generated text box for stuff with perfect scores
 
 from datetime import date
 import termplotlib as tpl
@@ -50,6 +52,17 @@ def histogramFunction(a, bins=11, width=25):
             '#'*int(width*h[i]/np.amax(h)), 
             h[i], 
             width=width))
+
+# terminal hyperlinks
+def link(uri, label=None):
+    if label is None: 
+        label = uri
+    parameters = ''
+
+    # OSC 8 ; params ; URI ST <name> OSC 8 ;; ST 
+    escape_mask = '\033]8;{};{}\033\\{}\033]8;;\033\\'
+
+    return escape_mask.format(parameters, uri, label)
 
 # review attributes
 '''
@@ -94,6 +107,24 @@ for i in range(len(reviews)):
     if len(str(reviews[i][5])) >= 2:
         while reviews[i][5][-1:] == "\n":
             reviews[i][5] = reviews[i][5][:-1]
+for i in range(len(reviews)):
+    if len(str(reviews[i][5])) >= 1:
+        while reviews[i][5][0] == "\n":
+            reviews[i][5] = reviews[i][5][1:]
+
+# retired method of adding hyperlinks
+'''
+for i in range(len(reviews)):
+    while "HTTP://" in str(reviews[i][5]).upper():
+        tempLinkStr = str(reviews[i][5])
+        linkStartIndex = tempLinkStr.upper().index("HTTP://")
+        substring = tempLinkStr[linkStartIndex:]
+        linkEndIndex = substring.index(")")
+        substring2 = substring[:linkEndIndex]
+        newLinkStr = link(substring2, 'link')
+        reviews[i][5] = tempLinkStr[:linkStartIndex]+newLinkStr+substring2[linkEndIndex:]
+'''
+
 
 # loop decision and reader variables
 typeChoice = ""
@@ -111,9 +142,12 @@ while userInput.upper() != "R" and userInput != "READ" and userInput != "READ CA
     userInput = userInput.upper()
 
 if userInput == "R" or userInput == "READ" or userInput == "READ CATALOG" or userInput == "CATALOG" or userInput == "READING":
-    while userInput.upper() not in reviewTypes:
+    while userInput.upper() not in reviewTypes and userInput.upper()[:-1] not in reviewTypes:
         userInput = takeInput("Review type: ")
-    typeChoice = userInput.upper()
+    if userInput.upper()[:-1] in reviewTypes:
+        typeChoice = userInput.upper()[:-1]
+    else:
+        typeChoice = userInput.upper()
     i = 0
     print("Catalog:")
     reviews = sorted(reviews, key=lambda x: x[2], reverse=True)
@@ -152,19 +186,43 @@ if userInput == "R" or userInput == "READ" or userInput == "READ CATALOG" or use
                 if reviews[index][2] >= 95:
                     tier = "SS"
                 # return contents of review, score, and tier
-                print(reviews[index][5]+"\n["+tier+"-TIER] Score -> "+str(reviews[index][2])+"\n")
+                if "HTTP://" in str(reviews[index][5]).upper():
+                    tempLinkStr = str(reviews[index][5])
+                    linkStartIndex = tempLinkStr.upper().index("HTTP://")
+                    substring = tempLinkStr[linkStartIndex:]
+                    linkEndIndex = substring.index(")")
+                    substring2 = substring[:linkEndIndex]
+                    newLinkStr = link(substring2, 'link')
+                    print(tempLinkStr[:linkStartIndex]+link(substring2, 'link')+substring2[linkEndIndex:])
+                else:
+                    print(reviews[index][5])
+                print("["+tier+"-TIER] Score -> "+str(reviews[index][2])+"\n")
         elif userInput == "STATS" or userInput == "STAT" or userInput == "STATISTICS":
             for i in range(len(reviews)):
                 if str(reviews[i][0]).upper() == typeChoice:
                     scoreData.append(reviews[i][2])
             print("Reviews: "+str(len(scoreData)))
-            print("Mean: "+str(statistics.mean(scoreData)))
+            print("Mean: "+str(round(statistics.mean(scoreData),1)))
             print("Median: "+str(statistics.median(scoreData)))
 
             for i in range(len(scoreData)):
                 if scoreData[i] == 100:
                     scoreData[i] = 110
             histogramFunction(scoreData)
+            print()
+            for i in range(len(scoreData)):
+                if scoreData[i] == 110:
+                    scoreData[i] = 100
+
+        elif userInput == "C" or userInput == "CATALOG":
+            print("Catalog:")
+            reviews = sorted(reviews, key=lambda x: x[2], reverse=True)
+            for i in range(len(reviews)):
+                if str(reviews[i][0]).upper() == typeChoice:
+                    nameDisplay = ("  ["+str(reviews[i][2])+"] ")[-6:]+reviews[i][1]
+                    reviewsDisplay.append(nameDisplay)
+            for i in range(len(reviewsDisplay)):
+                print(reviewsDisplay[i])
             print()
 
         elif userInput == "E" or userInput == "END":
